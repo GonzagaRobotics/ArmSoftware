@@ -16,6 +16,10 @@ FOREARM_DIR = 26
 WRIST_PWM = 16
 WRIST_DIR = 6
 
+# Base motor pins
+BASE_PWM = 15
+BASE_DIR = 14
+
 # Linear actuator PWM frequency
 FREQUENCY = 1000
 
@@ -65,7 +69,8 @@ def set_motor_speed(speed, pwm, GPIO_DIR):
 
 def set_motor_speed_software(speed, pwm_pin, GPIO_DIR):
     if abs(speed) < 0.1:
-        speed = 0
+        PI.set_PWM_dutycycle(pwm_pin, 0)
+        return
 
     speed = int(speed * 255)
 
@@ -75,8 +80,6 @@ def set_motor_speed_software(speed, pwm_pin, GPIO_DIR):
     elif speed < 0:
         PI.write(GPIO_DIR, 1)
         PI.set_PWM_dutycycle(pwm_pin, -speed)
-    else:
-        PI.set_PWM_dutycycle(pwm_pin, 0)
 
 
 def set_servo_pos(pwm_pin, pos):
@@ -148,6 +151,7 @@ def shutdown():
 
 
 class PWMROS(Node):
+    base_sub: Subscription
     shoulder_sub: Subscription
     forearm_sub: Subscription
     wrist_sub: Subscription
@@ -157,6 +161,13 @@ class PWMROS(Node):
 
     def __init__(self):
         super().__init__('pwm_ros')
+
+        self.base_sub = self.create_subscription(
+            Float32,
+            '/arm/base',
+            self.base_callback,
+            10
+        )
 
         self.shoulder_sub = self.create_subscription(
             Float32,
@@ -205,6 +216,11 @@ class PWMROS(Node):
 
         self.get_logger().info('Arm ready')
 
+    def base_callback(self, msg: Float32):
+        self.get_logger().info('Base: %s' % msg.data)
+
+        set_motor_speed_software(msg.data, BASE_PWM, BASE_DIR)
+
     def shoulder_callback(self, msg: Float32):
         self.get_logger().info('Shoulder: %s' % msg.data)
 
@@ -244,6 +260,9 @@ def main(args=None):
     PI.set_PWM_frequency(WRIST_PWM, 1000)
     PI.set_PWM_dutycycle(WRIST_PWM, 0)
 
+    PI.set_mode(BASE_PWM, pigpio.OUTPUT)
+    PI.set_mode(BASE_DIR, pigpio.OUTPUT)
+    PI.set_mode(SHOULDER_PWM, pigpio.OUTPUT)
     PI.set_mode(SHOULDER_DIR, pigpio.OUTPUT)
     PI.set_mode(FOREARM_DIR, pigpio.OUTPUT)
     PI.set_mode(WRIST_PWM, pigpio.OUTPUT)

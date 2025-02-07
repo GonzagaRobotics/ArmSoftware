@@ -1,49 +1,33 @@
 # Arm Software
 
+Version: 0.1.0
+
+Code name: N/A
+
 ## Introduction
 
-TL;DR: Collection of software for the robotic arm.
+Controls the robotic arm.
 
-## Quick Start
+## Dependencies
 
-Make sure you have the following installed on your (Ubuntu) system:
-
--   Modern Python 3
--   ROS2 Humble
--   System dependencies: ros-humble-rosbridge-server
+-   System dependencies: ros-humble-rosbridge-server (if directly connecting to ControlSystem)
 -   Python dependencies: pigpio
 
-Then, run the following commands inside the root of the repository:
+## Building
 
 ```bash
 # Make sure you have the ROS2 environment sourced
 
-# Build the packages (first time only)
+# Build the packages (first time or after changes)
 colcon build --symlink-install
 
 # Source the overlay workspace (every time you open a new terminal)
 source install/local_setup.bash
 ```
 
-### Running just the PWM Controller
+## Network Configuration
 
-```bash
-ros2 run pwm_ros pwm_ros
-```
-
-### Running the Controller using the GUI
-
-Make sure that you have connected your machine to the Pi with an ethernet cable, and that the Pi lists the ethernet connection as "connected" in the network settings.
-
-Then, run the following command:
-
-```bash
-ros2 launch launch/launch.py
-```
-
-See the GUI itself for further instructions on how to use it.
-
-You might need to to change your ethernet settings on your machine to:
+You need to configure your computer's ethernet settings to work with the arm. Have the following settings:
 
 -   IPv4: Manual
 -   Address: 192.168.0.3
@@ -51,4 +35,26 @@ You might need to to change your ethernet settings on your machine to:
 -   Gateway: 192.168.0.254
 -   DNS: 192.168.0.254
 
-But try it without changing the settings first.
+**Of course, your computer may just decide to not connect because it feels like it.**
+
+## Running
+
+Before running, make sure you call `sudo pigpiod` to start the pigpio daemon. This only needs to be done once per boot.
+
+### Just the Arm
+
+```bash
+ros2 launch launch/launch.py
+```
+
+### The Arm directly connected to ControlSystem
+
+Then, run the following command:
+
+```bash
+ros2 launch launch/launch_rosbridge.py
+```
+
+This will also start the rosbridge server.
+
+See the ControlSystem README for more information on using it.

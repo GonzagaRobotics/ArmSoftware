@@ -98,6 +98,29 @@ def stepper_tick():
         MINOR_X_LAST_VALUE = 0
 
 
+def start():
+    global PI
+
+    PI = pigpio.pi()
+
+    PI.set_PWM_frequency(WRIST_PWM, 1000)
+    PI.set_PWM_dutycycle(WRIST_PWM, 0)
+
+    # PI.set_mode(BASE_PWM, pigpio.OUTPUT)
+    # PI.set_mode(BASE_DIR, pigpio.OUTPUT)
+    PI.set_mode(SHOULDER_PWM, pigpio.OUTPUT)
+    PI.set_mode(SHOULDER_DIR, pigpio.OUTPUT)
+    PI.set_mode(FOREARM_PWM, pigpio.OUTPUT)
+    PI.set_mode(FOREARM_DIR, pigpio.OUTPUT)
+    PI.set_mode(WRIST_PWM, pigpio.OUTPUT)
+    PI.set_mode(WRIST_DIR, pigpio.OUTPUT)
+    # PI.set_mode(MINOR_X_STEP, pigpio.OUTPUT)
+    # PI.set_mode(MINOR_X_DIR, pigpio.OUTPUT)
+
+    PI.hardware_PWM(SHOULDER_PWM, ACTUATOR_FREQUENCY, 0)
+    PI.hardware_PWM(FOREARM_PWM, ACTUATOR_FREQUENCY, 0)
+
+
 def shutdown():
     set_motor_speed(0, SHOULDER_PWM, SHOULDER_DIR)
     set_motor_speed(0, FOREARM_PWM, FOREARM_DIR)
@@ -117,6 +140,24 @@ class Arm(Node):
 
     def __init__(self):
         super().__init__('arm')
+
+        # Declare parameters, with the default values being the current global values
+        # Any parameters set at runtime will override these
+
+        global SHOULDER_PWM, SHOULDER_DIR, FOREARM_PWM, FOREARM_DIR, WRIST_PWM, WRIST_DIR
+
+        SHOULDER_PWM = self.declare_parameter(
+            'shoulder_pwm', SHOULDER_PWM).value
+        SHOULDER_DIR = self.declare_parameter(
+            'shoulder_dir', SHOULDER_DIR).value
+        FOREARM_PWM = self.declare_parameter(
+            'forearm_pwm', FOREARM_PWM).value
+        FOREARM_DIR = self.declare_parameter(
+            'forearm_dir', FOREARM_DIR).value
+        WRIST_PWM = self.declare_parameter(
+            'wrist_pwm', WRIST_PWM).value
+        WRIST_DIR = self.declare_parameter(
+            'wrist_dir', WRIST_DIR).value
 
         self.base_sub = self.create_subscription(
             Float32,
@@ -153,8 +194,6 @@ class Arm(Node):
             10
         )
 
-        self.get_logger().info('Arm ready')
-
     def base_callback(self, msg: Float32):
         self.get_logger().info('Base: %s' % msg.data)
 
@@ -182,30 +221,13 @@ class Arm(Node):
 
 
 def main(args=None):
-    global PI
-
-    PI = pigpio.pi()
-
-    PI.set_PWM_frequency(WRIST_PWM, 1000)
-    PI.set_PWM_dutycycle(WRIST_PWM, 0)
-
-    # PI.set_mode(BASE_PWM, pigpio.OUTPUT)
-    # PI.set_mode(BASE_DIR, pigpio.OUTPUT)
-    PI.set_mode(SHOULDER_PWM, pigpio.OUTPUT)
-    PI.set_mode(SHOULDER_DIR, pigpio.OUTPUT)
-    PI.set_mode(FOREARM_PWM, pigpio.OUTPUT)
-    PI.set_mode(FOREARM_DIR, pigpio.OUTPUT)
-    PI.set_mode(WRIST_PWM, pigpio.OUTPUT)
-    PI.set_mode(WRIST_DIR, pigpio.OUTPUT)
-    # PI.set_mode(MINOR_X_STEP, pigpio.OUTPUT)
-    # PI.set_mode(MINOR_X_DIR, pigpio.OUTPUT)
-
-    PI.hardware_PWM(SHOULDER_PWM, ACTUATOR_FREQUENCY, 0)
-    PI.hardware_PWM(FOREARM_PWM, ACTUATOR_FREQUENCY, 0)
-
     rclpy.init(args=args)
 
     arm = Arm()
+
+    start()
+
+    arm.get_logger().info('Arm ready')
 
     try:
         while rclpy.ok():

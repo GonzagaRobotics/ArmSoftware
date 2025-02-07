@@ -18,7 +18,7 @@ Controls the robotic arm.
 ```bash
 # Make sure you have the ROS2 environment sourced
 
-# Build the packages (first time or after changes)
+# Build the packages
 colcon build --symlink-install
 
 # Source the overlay workspace (every time you open a new terminal)
@@ -41,20 +41,25 @@ You need to configure your computer's ethernet settings to work with the arm. Ha
 
 Before running, make sure you call `sudo pigpiod` to start the pigpio daemon. This only needs to be done once per boot.
 
-### Just the Arm
+To run the arm, run `ros2 run arm arm`. This will start the arm node.
+
+The node has 6 optional parameters:
+
+-   shoulder_pwm: GPIO pin for the shoulder PWM signal
+-   shoulder_dir: GPIO pin for the shoulder direction signal
+-   forearm_pwm: GPIO pin for the forearm PWM signal
+-   forearm_dir: GPIO pin for the forearm direction signal
+-   wrist_pwm: GPIO pin for the wrist PWM signal
+-   wrist_dir: GPIO pin for the wrist direction signal
+
+To set these parameters run `ros2 run arm arm --ros-args -p [param_name]:=[value]`.
+
+Example:
 
 ```bash
-ros2 launch launch/launch.py
+ros2 run arm arm --ros-args -p shoulder_pwm:=17 -p shoulder_dir:=19 -p forearm_dir:=1
 ```
 
-### The Arm directly connected to ControlSystem
+## Controlling Directly
 
-Then, run the following command:
-
-```bash
-ros2 launch launch/launch_rosbridge.py
-```
-
-This will also start the rosbridge server.
-
-See the ControlSystem README for more information on using it.
+If you want to run the arm with the ControlSystem, open a new terminal and run `ros2 launch rosbridge_server rosbridge_websocket.launch.xml` to start the rosbridge server.

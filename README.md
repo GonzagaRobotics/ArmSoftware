@@ -95,4 +95,4 @@ If your Desktop Environment supports it, use the proper GUI to change your netwo
 - You can check your routing tables to see if it's been set appropriately with `ip r`. Running `route` can also be used, but might be less clear about the gateway.
 - Retry the ssh'ing into the Pi.
 
-If these steps don't work, continue using `ip a`, `ip r`, and `route` to check the status of your device. You may need to disable some network managing services temporarily and retry these steps.
+If these steps don't work, continue using `ip a`, `ip r`, and `route` to check the status of your device throughout these steps. You may need to disable some network managing services temporarily and retry. You can also flush the routes and addresses of your ethernet device and try again. Note that you can also remove addresses by replacing the `add` with `del` in the above commands.

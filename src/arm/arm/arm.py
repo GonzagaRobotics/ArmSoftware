@@ -1,3 +1,10 @@
+import pigpio
+import RPi.GPIO as GPIO
+import time
+
+# https://youtu.be/9F3iBMYvQOs?t=46
+GPIO.setwarnings(False)
+
 import rclpy
 from rclpy.node import Node, Subscription
 from std_msgs.msg import Float32, Int32
@@ -19,6 +26,9 @@ WRIST_DIR = 16
 # Base motor pins
 BASE_PWM = 22
 BASE_DIR = 27
+
+LEFT_MINOR_GRABBER_SERVO_PWM = 10
+RIGHT_MINOR_GRABBER_SERVO_PWM = 9
 
 # Linear actuator PWM frequency
 ACTUATOR_FREQUENCY = 1000
@@ -75,10 +85,19 @@ def set_motor_speed_software(speed, pwm_pin, GPIO_DIR):
 
 
 def set_minor_x(dir: int):
-    global MINOR_X_ON
+    #global MINOR_X_ON
 
-    MINOR_X_ON = dir != 0
+    #MINOR_X_ON = dir != 0
+
+    if dir == 0:
+        PI.write(MINOR_X_STEP,0)
+        return
+    
     PI.write(MINOR_X_DIR, dir > 0)
+    PI.write(MINOR_X_STEP,1)
+    time.sleep(0.01)
+    PI.write(MINOR_X_STEP,0)
+    time.sleep(0.01)
 
 
 def stepper_tick():
@@ -98,7 +117,7 @@ def stepper_tick():
         MINOR_X_LAST_VALUE = 0
 
 
-def start():
+def start(arm):
     global PI
 
     PI = pigpio.pi()
@@ -123,15 +142,23 @@ def start():
     # PI.hardware_PWM(FOREARM_PWM, ACTUATOR_FREQUENCY, 0)
     PI.hardware_PWM(WRIST_PWM, ACTUATOR_FREQUENCY, 0)
 
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(LEFT_MINOR_GRABBER_SERVO_PWM, GPIO.OUT)
+    GPIO.setup(RIGHT_MINOR_GRABBER_SERVO_PWM, GPIO.OUT)
+    # PWM with 50 Hz
+    arm.grabber_l = GPIO.PWM(LEFT_MINOR_GRABBER_SERVO_PWM, 50)
+    arm.grabber_l.start(2.5)
+    arm.grabber_r = GPIO.PWM(RIGHT_MINOR_GRABBER_SERVO_PWM, 50)
+    arm.grabber_r.start(2.5)
+
 
 def shutdown():
     set_motor_speed(0, SHOULDER_PWM, SHOULDER_DIR)
-    # set_motor_speed(0, FOREARM_PWM, FOREARM_DIR)
-    set_motor_speed_software(0, FOREARM_PWM, FOREARM_DIR)
-    # set_motor_speed_software(0, WRIST_PWM, WRIST_DIR)
-    set_motor_speed(0, WRIST_PWM, WRIST_DIR)
-    set_motor_speed_software(0, BASE_PWM, BASE_DIR)
-    set_minor_x(0)
+    set_motor_speed(0, FOREARM_PWM, FOREARM_DIR)
+    set_motor_speed_software(0, WRIST_PWM, WRIST_DIR)
+    # set_motor_speed_software(0, BASE_PWM, BASE_DIR)
+    # set_minor_x(0)
+    PI.write(MINOR_X_STEP,0)
 
     PI.stop()
 
@@ -141,7 +168,11 @@ class Arm(Node):
     shoulder_sub: Subscription
     forearm_sub: Subscription
     wrist_sub: Subscription
+    grabber_sub: Subscription
     minor_x_sub: Subscription
+
+    grabber_l: GPIO.PWM
+    grabber_r: GPIO.PWM
 
     def __init__(self):
         super().__init__('arm')
@@ -149,7 +180,7 @@ class Arm(Node):
         # Declare parameters, with the default values being the current global values
         # Any parameters set at runtime will override these
 
-        global SHOULDER_PWM, SHOULDER_DIR, FOREARM_PWM, FOREARM_DIR, WRIST_PWM, WRIST_DIR
+        global SHOULDER_PWM, SHOULDER_DIR, FOREARM_PWM, FOREARM_DIR, WRIST_PWM, WRIST_DIR, LEFT_MINOR_GRABBER_SERVO_PWM, RIGHT_MINOR_GRABBER_SERVO_PWM, MINOR_X_DIR, MINOR_X_STEP
 
         SHOULDER_PWM = self.declare_parameter(
             'shoulder_pwm', SHOULDER_PWM).value
@@ -163,6 +194,14 @@ class Arm(Node):
             'wrist_pwm', WRIST_PWM).value
         WRIST_DIR = self.declare_parameter(
             'wrist_dir', WRIST_DIR).value
+        LEFT_MINOR_GRABBER_SERVO_PWM = self.declare_parameter(
+            'left_grabber_pwm', LEFT_MINOR_GRABBER_SERVO_PWM).value
+        RIGHT_MINOR_GRABBER_SERVO_PWM = self.declare_parameter(
+            'right_grabber_pwm', RIGHT_MINOR_GRABBER_SERVO_PWM).value
+        MINOR_X_DIR= self.declare_parameter(
+            'x_dir', MINOR_X_DIR).value
+        MINOR_X_STEP= self.declare_parameter(
+            'x_step', MINOR_X_STEP).value
 
         self.base_sub = self.create_subscription(
             Float32,
@@ -186,7 +225,7 @@ class Arm(Node):
         )
 
         self.wrist_sub = self.create_subscription(
-            Int32,
+            Float32,
             '/arm/wrist',
             self.wrist_callback,
             10
@@ -196,6 +235,13 @@ class Arm(Node):
             Int32,
             '/arm/minor/x',
             self.minor_x_callback,
+            10
+        )
+
+        self.grabber_sub = self.create_subscription(
+            Int32,
+            '/arm/minor/grabber',
+            self.grabber_callback,
             10
         )
 
@@ -226,13 +272,23 @@ class Arm(Node):
 
         set_minor_x(msg.data)
 
+    def grabber_callback(self, msg: Int32):
+        self.get_logger().info('Minor Grabber: %s' % msg.data)
+        if (msg.data == 1):
+            # Open
+            self.grabber_l.start(2.5) 
+            self.grabber_r.start(2.5) 
+        elif (msg.data == -1):
+            # Close
+            self.grabber_l.start(12.5) 
+            self.grabber_r.start(12.5) 
 
 def main(args=None):
     rclpy.init(args=args)
 
     arm = Arm()
 
-    start()
+    start(arm)
 
     arm.get_logger().info('Arm ready')
 

@@ -14,26 +14,26 @@ FORWARD = 1
 BACKWARD = 0
 
 # Linear actuator pins
-SHOULDER_PWM = 13
-SHOULDER_DIR = 6
-FOREARM_PWM = 19
-FOREARM_DIR = 26
-WRIST_PWM = 12
-WRIST_DIR = 16
+SHOULDER_PWM = 12
+SHOULDER_DIR = 0
+FOREARM_PWM = 13
+FOREARM_DIR = 1
+WRIST_PWM = 8
+WRIST_DIR = 7
 
 # Base motor pins
-BASE_PWM = 22
-BASE_DIR = 27
+BASE_PWM = 5
+BASE_DIR = 4
 
-LEFT_MINOR_GRABBER_SERVO_PWM = 10
-RIGHT_MINOR_GRABBER_SERVO_PWM = 9
+LEFT_MINOR_GRABBER_SERVO_PWM = 24
+RIGHT_MINOR_GRABBER_SERVO_PWM = 23
 
 # Linear actuator PWM frequency
 ACTUATOR_FREQUENCY = 1000
 
 # Stepper motors pins
-MINOR_X_DIR = 14
-MINOR_X_STEP = 15
+MINOR_X_DIR = 26
+MINOR_X_STEP = 27
 
 # Number of steps per revolution
 STEPPER_SPR = 200
@@ -112,10 +112,8 @@ def start(arm):
 
     PI = pigpio.pi()
 
-    # PI.set_PWM_frequency(WRIST_PWM, 1000)
-    # PI.set_PWM_dutycycle(WRIST_PWM, 0)
-    PI.set_PWM_frequency(FOREARM_PWM, 1000)
-    PI.set_PWM_dutycycle(FOREARM_PWM, 0)
+    PI.set_PWM_frequency(WRIST_PWM, 1000)
+    PI.set_PWM_dutycycle(WRIST_PWM, 0)
 
     PI.set_mode(BASE_PWM, pigpio.OUTPUT)
     PI.set_mode(BASE_DIR, pigpio.OUTPUT)
@@ -129,25 +127,16 @@ def start(arm):
     PI.set_mode(MINOR_X_DIR, pigpio.OUTPUT)
 
     PI.hardware_PWM(SHOULDER_PWM, ACTUATOR_FREQUENCY, 0)
-    # PI.hardware_PWM(FOREARM_PWM, ACTUATOR_FREQUENCY, 0)
-    PI.hardware_PWM(WRIST_PWM, ACTUATOR_FREQUENCY, 0)
+    PI.hardware_PWM(FOREARM_PWM, ACTUATOR_FREQUENCY, 0)
 
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setup(LEFT_MINOR_GRABBER_SERVO_PWM, GPIO.OUT)
-    GPIO.setup(RIGHT_MINOR_GRABBER_SERVO_PWM, GPIO.OUT)
-    # PWM with 50 Hz
-    arm.grabber_l = GPIO.PWM(LEFT_MINOR_GRABBER_SERVO_PWM, 50)
-    arm.grabber_l.start(2.5)
-    arm.grabber_r = GPIO.PWM(RIGHT_MINOR_GRABBER_SERVO_PWM, 50)
-    arm.grabber_r.start(2.5)
+    PI.set_servo_pulsewidth(LEFT_MINOR_GRABBER_SERVO_PWM, 1500)
+    PI.set_servo_pulsewidth(RIGHT_MINOR_GRABBER_SERVO_PWM, 1500)
 
 
 def shutdown():
     set_motor_speed(0, SHOULDER_PWM, SHOULDER_DIR)
     set_motor_speed(0, FOREARM_PWM, FOREARM_DIR)
     set_motor_speed_software(0, WRIST_PWM, WRIST_DIR)
-    # set_motor_speed_software(0, BASE_PWM, BASE_DIR)
-    # set_minor_x(0)
     PI.write(MINOR_X_STEP, 0)
 
     PI.stop()
@@ -160,9 +149,6 @@ class Arm(Node):
     wrist_sub: Subscription
     grabber_sub: Subscription
     minor_x_sub: Subscription
-
-    grabber_l: GPIO.PWM
-    grabber_r: GPIO.PWM
 
     def __init__(self):
         super().__init__('arm')
@@ -248,14 +234,12 @@ class Arm(Node):
     def forearm_callback(self, msg: Float32):
         self.get_logger().info('Forearm: %s' % msg.data)
 
-        # set_motor_speed(msg.data, FOREARM_PWM, FOREARM_DIR)
-        set_motor_speed_software(msg.data, FOREARM_PWM, FOREARM_DIR)
+        set_motor_speed(msg.data, FOREARM_PWM, FOREARM_DIR)
 
     def wrist_callback(self, msg: Int32):
         self.get_logger().info('Wrist: %s' % msg.data)
 
-        # set_motor_speed_software(msg.data, WRIST_PWM, WRIST_DIR)
-        set_motor_speed(msg.data, WRIST_PWM, WRIST_DIR)
+        set_motor_speed_software(msg.data, WRIST_PWM, WRIST_DIR)
 
     def minor_x_callback(self, msg: Int32):
         self.get_logger().info('Minor X: %s' % msg.data)
@@ -263,15 +247,18 @@ class Arm(Node):
         set_minor_x(msg.data)
 
     def grabber_callback(self, msg: Int32):
+        global PI
+
         self.get_logger().info('Minor Grabber: %s' % msg.data)
+
         if (msg.data == 1):
             # Open
-            self.grabber_l.start(2.5)
-            self.grabber_r.start(2.5)
+            PI.set_servo_pulsewidth(LEFT_MINOR_GRABBER_SERVO_PWM, 500)
+            PI.set_servo_pulsewidth(RIGHT_MINOR_GRABBER_SERVO_PWM, 500)
         elif (msg.data == -1):
             # Close
-            self.grabber_l.start(12.5)
-            self.grabber_r.start(12.5)
+            PI.set_servo_pulsewidth(LEFT_MINOR_GRABBER_SERVO_PWM, 2500)
+            PI.set_servo_pulsewidth(RIGHT_MINOR_GRABBER_SERVO_PWM, 2500)
 
 
 def main(args=None):
@@ -286,7 +273,7 @@ def main(args=None):
     try:
         while rclpy.ok():
             rclpy.spin_once(arm, timeout_sec=0)
-            stepper_tick()
+            # stepper_tick()
     except KeyboardInterrupt:
         pass
     finally:

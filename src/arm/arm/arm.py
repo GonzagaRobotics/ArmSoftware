@@ -1,15 +1,13 @@
-import pigpio
-import RPi.GPIO as GPIO
-import time
-
-# https://youtu.be/9F3iBMYvQOs?t=46
-GPIO.setwarnings(False)
-
 import rclpy
 from rclpy.node import Node, Subscription
 from std_msgs.msg import Float32, Int32
 import pigpio
 import time
+
+# Alright, that was actually kind of funny. But I also do care about what those
+# warnings are and what caused them, so I'm commenting this out for now. -DL
+# https://youtu.be/9F3iBMYvQOs?t=46
+# GPIO.setwarnings(False)
 
 # Direction definitions
 FORWARD = 1
@@ -85,19 +83,11 @@ def set_motor_speed_software(speed, pwm_pin, GPIO_DIR):
 
 
 def set_minor_x(dir: int):
-    #global MINOR_X_ON
+    global MINOR_X_ON
 
-    #MINOR_X_ON = dir != 0
+    MINOR_X_ON = dir != 0
 
-    if dir == 0:
-        PI.write(MINOR_X_STEP,0)
-        return
-    
     PI.write(MINOR_X_DIR, dir > 0)
-    PI.write(MINOR_X_STEP,1)
-    time.sleep(0.01)
-    PI.write(MINOR_X_STEP,0)
-    time.sleep(0.01)
 
 
 def stepper_tick():
@@ -158,7 +148,7 @@ def shutdown():
     set_motor_speed_software(0, WRIST_PWM, WRIST_DIR)
     # set_motor_speed_software(0, BASE_PWM, BASE_DIR)
     # set_minor_x(0)
-    PI.write(MINOR_X_STEP,0)
+    PI.write(MINOR_X_STEP, 0)
 
     PI.stop()
 
@@ -198,9 +188,9 @@ class Arm(Node):
             'left_grabber_pwm', LEFT_MINOR_GRABBER_SERVO_PWM).value
         RIGHT_MINOR_GRABBER_SERVO_PWM = self.declare_parameter(
             'right_grabber_pwm', RIGHT_MINOR_GRABBER_SERVO_PWM).value
-        MINOR_X_DIR= self.declare_parameter(
+        MINOR_X_DIR = self.declare_parameter(
             'x_dir', MINOR_X_DIR).value
-        MINOR_X_STEP= self.declare_parameter(
+        MINOR_X_STEP = self.declare_parameter(
             'x_step', MINOR_X_STEP).value
 
         self.base_sub = self.create_subscription(
@@ -276,12 +266,13 @@ class Arm(Node):
         self.get_logger().info('Minor Grabber: %s' % msg.data)
         if (msg.data == 1):
             # Open
-            self.grabber_l.start(2.5) 
-            self.grabber_r.start(2.5) 
+            self.grabber_l.start(2.5)
+            self.grabber_r.start(2.5)
         elif (msg.data == -1):
             # Close
-            self.grabber_l.start(12.5) 
-            self.grabber_r.start(12.5) 
+            self.grabber_l.start(12.5)
+            self.grabber_r.start(12.5)
+
 
 def main(args=None):
     rclpy.init(args=args)

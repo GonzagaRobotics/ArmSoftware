@@ -25,6 +25,7 @@ WRIST_DIR = 7
 BASE_PWM = 5
 BASE_DIR = 4
 
+ROT_MINOR_GRABBER_SERVO_PWM = 22
 LEFT_MINOR_GRABBER_SERVO_PWM = 24
 RIGHT_MINOR_GRABBER_SERVO_PWM = 23
 
@@ -87,12 +88,11 @@ def set_minor_x(dir: int):
 
     MINOR_X_ON = dir != 0
 
-    PI.write(MINOR_X_DIR, dir > 0)
+    PI.write(MINOR_X_DIR, dir < 0)
 
 
 def stepper_tick():
-    global LAST_STEPPER_TICK_TIME
-    global MINOR_X_LAST_VALUE
+    global LAST_STEPPER_TICK_TIME, MINOR_X_ON, MINOR_X_LAST_VALUE
 
     if time.time() - LAST_STEPPER_TICK_TIME < STEPPER_TICK_DELAY:
         return
@@ -125,12 +125,16 @@ def start(arm):
     PI.set_mode(WRIST_DIR, pigpio.OUTPUT)
     PI.set_mode(MINOR_X_STEP, pigpio.OUTPUT)
     PI.set_mode(MINOR_X_DIR, pigpio.OUTPUT)
+    PI.set_mode(LEFT_MINOR_GRABBER_SERVO_PWM, pigpio.OUTPUT)
+    PI.set_mode(RIGHT_MINOR_GRABBER_SERVO_PWM, pigpio.OUTPUT)
+    PI.set_mode(ROT_MINOR_GRABBER_SERVO_PWM, pigpio.OUTPUT)
 
     PI.hardware_PWM(SHOULDER_PWM, ACTUATOR_FREQUENCY, 0)
     PI.hardware_PWM(FOREARM_PWM, ACTUATOR_FREQUENCY, 0)
 
     PI.set_servo_pulsewidth(LEFT_MINOR_GRABBER_SERVO_PWM, 1500)
     PI.set_servo_pulsewidth(RIGHT_MINOR_GRABBER_SERVO_PWM, 1500)
+    PI.set_servo_pulsewidth(ROT_MINOR_GRABBER_SERVO_PWM, 1500)
 
 
 def shutdown():
@@ -221,6 +225,13 @@ class Arm(Node):
             10
         )
 
+        self.create_subscription(
+            Int32,
+            '/arm/minor/grabber_rot',
+            self.grabber_rot_cb,
+            10
+        )
+
     def base_callback(self, msg: Float32):
         self.get_logger().info('Base: %s' % msg.data)
 
@@ -260,6 +271,16 @@ class Arm(Node):
             PI.set_servo_pulsewidth(LEFT_MINOR_GRABBER_SERVO_PWM, 2500)
             PI.set_servo_pulsewidth(RIGHT_MINOR_GRABBER_SERVO_PWM, 2500)
 
+    def grabber_rot_cb(self, msg: Int32):
+        global PI
+
+        self.get_logger().info('Grabber Rotation: %s' % msg.data)
+
+        if (msg.data == 1):
+            PI.set_servo_pulsewidth(ROT_MINOR_GRABBER_SERVO_PWM, 1000)
+        elif (msg.data == -1):
+            PI.set_servo_pulsewidth(ROT_MINOR_GRABBER_SERVO_PWM, 2000)
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -273,7 +294,7 @@ def main(args=None):
     try:
         while rclpy.ok():
             rclpy.spin_once(arm, timeout_sec=0)
-            # stepper_tick()
+            stepper_tick()
     except KeyboardInterrupt:
         pass
     finally:

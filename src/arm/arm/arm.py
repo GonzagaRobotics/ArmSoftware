@@ -18,8 +18,8 @@ SHOULDER_PWM = 12
 SHOULDER_DIR = 20
 FOREARM_PWM = 13
 FOREARM_DIR = 21
-WRIST_PWM = 8
-WRIST_DIR = 7
+WRIST_PWM = 11
+WRIST_DIR = 6
 
 # Base motor pins
 BASE_PWM = 5
@@ -88,7 +88,7 @@ def set_minor_x(dir: int):
 
     MINOR_X_ON = dir != 0
 
-    PI.write(MINOR_X_DIR, dir < 0)
+    PI.write(MINOR_X_DIR, dir > 0)
 
 
 def stepper_tick():
